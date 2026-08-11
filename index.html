@@ -11,9 +11,9 @@
 // Usage: yourpage.html?Secret=BASE32SECRET
 
 const params = new URLSearchParams(window.location.search);
-const secret = params.get("Secret") || "";
-const digits = parseInt(params.get("Digits") || "6");
-const period = parseInt(params.get("Period") || "30");
+const secret = params.get("Secret") || params.get("secret") || "";
+const digits = parseInt(params.get("Digits") || params.get("digits") || "6");
+const period = parseInt(params.get("Period") || params.get("period") || "30");
 
 function base32Decode(input) {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";

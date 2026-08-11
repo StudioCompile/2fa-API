@@ -8,7 +8,7 @@
 <pre id="code">loading...</pre>
 
 <script>
-// Usage: yourpage.html?Name=Example&Secret=BASE32SECRET
+// Usage: yourpage.html?Secret=BASE32SECRET
 
 const params = new URLSearchParams(window.location.search);
 const secret = params.get("Secret") || "";
@@ -29,9 +29,8 @@ function base32Decode(input) {
   return new Uint8Array(bytes);
 }
 
-async function getTOTP() {
+async function totpForCounter(counter) {
   const keyBytes = base32Decode(secret);
-  const counter = Math.floor(Date.now() / 1000 / period);
 
   const counterBytes = new ArrayBuffer(8);
   new DataView(counterBytes).setUint32(4, counter);
@@ -57,11 +56,25 @@ async function update() {
     document.getElementById("code").textContent = "Missing Secret param";
     return;
   }
-  document.getElementById("code").textContent = await getTOTP();
+
+  const periodMs = period * 1000;
+  const msIntoPeriod = Date.now() % periodMs;
+  const remainingMs = periodMs - msIntoPeriod;
+  const counter = Math.floor(Date.now() / periodMs);
+
+  // If current code is about to expire, give the NEXT code instead,
+  // marked with a ~ so the shortcut knows to wait before using it.
+  if (remainingMs <= 2500) {
+    const nextCode = await totpForCounter(counter + 1);
+    document.getElementById("code").textContent = "~" + nextCode;
+  } else {
+    const code = await totpForCounter(counter);
+    document.getElementById("code").textContent = code;
+  }
 }
 
 update();
-setInterval(update, 1000);
+setInterval(update, 500);
 </script>
 </body>
 </html>

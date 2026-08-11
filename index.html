@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>2FA Code</title>
+</head>
+<body>
+<pre id="code">loading...</pre>
+
+<script>
+// Usage: yourpage.html?Name=Example&Secret=BASE32SECRET
+
+const params = new URLSearchParams(window.location.search);
+const secret = params.get("Secret") || "";
+const digits = parseInt(params.get("Digits") || "6");
+const period = parseInt(params.get("Period") || "30");
+
+function base32Decode(input) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const clean = input.toUpperCase().replace(/[^A-Z2-7]/g, "");
+  let bits = "";
+  for (const char of clean) {
+    bits += alphabet.indexOf(char).toString(2).padStart(5, "0");
+  }
+  const bytes = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.substring(i, i + 8), 2));
+  }
+  return new Uint8Array(bytes);
+}
+
+async function getTOTP() {
+  const keyBytes = base32Decode(secret);
+  const counter = Math.floor(Date.now() / 1000 / period);
+
+  const counterBytes = new ArrayBuffer(8);
+  new DataView(counterBytes).setUint32(4, counter);
+
+  const key = await crypto.subtle.importKey(
+    "raw", keyBytes, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
+  );
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, counterBytes));
+
+  const offset = sig[sig.length - 1] & 0x0f;
+  const code = (
+    ((sig[offset] & 0x7f) << 24) |
+    ((sig[offset + 1] & 0xff) << 16) |
+    ((sig[offset + 2] & 0xff) << 8) |
+    (sig[offset + 3] & 0xff)
+  ) % (10 ** digits);
+
+  return code.toString().padStart(digits, "0");
+}
+
+async function update() {
+  if (!secret) {
+    document.getElementById("code").textContent = "Missing Secret param";
+    return;
+  }
+  document.getElementById("code").textContent = await getTOTP();
+}
+
+update();
+setInterval(update, 1000);
+</script>
+</body>
+</html>
